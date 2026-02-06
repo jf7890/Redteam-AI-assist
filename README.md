@@ -51,6 +51,8 @@ Redteam-AI-assist/
   requirements.txt
   pyproject.toml
   README.md
+  docs/
+    architecture.mmd
 ```
 
 ## 3. Setup (Debian)
@@ -322,3 +324,11 @@ pytest -q
 
 This project is intended for isolated cyber range labs.  
 Do not use outside authorized environments.
+
+## 12. Architecture Diagram
+
+Mermaid diagram file: `docs/architecture.mmd`.
+
+You can render it with:
+- GitHub (auto-render in Markdown viewers that support Mermaid).
+- `npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png`

@@ -1,0 +1,42 @@
+flowchart LR
+  %% Redteam AI Assist - Architecture Overview
+
+  subgraph Client["Client / Orchestrator"]
+    A1["Kali VM Agent"]
+    A2["Router / Orchestrator"]
+  end
+
+  subgraph Service["Redteam AI Assist Service (Debian LXC)"]
+    S1["FastAPI API"]
+    S2["LangGraph Workflow"]
+    S3["Policy Guard"]
+    S4["Session Store (runtime/sessions)"]
+    S5["RAG Retriever"]
+    S6["Vector Index (data/rag/index)"]
+    S7["Knowledge Base (data/rag/knowledge_base)"]
+    S8["LLM Client"]
+  end
+
+  subgraph External["External Services"]
+    E1["LLM Provider (OpenAI/Groq)"]
+    E2["HF Inference API (Embeddings)"]
+  end
+
+  A1 -->|Telemetry events| S1
+  A2 -->|Session lifecycle| S1
+  S1 --> S2
+  S2 --> S5
+  S5 --> S6
+  S6 --> S7
+  S2 --> S8
+  S8 --> E1
+  S5 --> E2
+  S3 --> S1
+  S2 --> S3
+  S1 --> S4
+
+  S1 -->|Suggestions| A2
+  S1 -->|Notes/Reports| A2
+
+  classDef store fill:#eef,stroke:#88a,stroke-width:1px;
+  class S4,S6,S7 store;
