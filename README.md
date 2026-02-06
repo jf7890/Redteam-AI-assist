@@ -2,8 +2,6 @@
 
 LangGraph-based, multi-tenant redteam coaching assistant for your cyber range.
 
-Project path: `D:\vannhan\Redteam-AI-assist`
-
 The assistant is designed for **lab-only** usage:
 - Tracks a user session by `tenant_id`, `user_id`, `agent_id`.
 - Ingests user telemetry events (command/http/notes/scan summary).
@@ -55,20 +53,22 @@ Redteam-AI-assist/
   README.md
 ```
 
-## 3. Setup
+## 3. Setup (Debian)
 
 Requirements:
 - Python 3.11+
-- PowerShell (Windows)
+- `python3-venv` package
 
 Install:
 
-```powershell
-cd D:\vannhan\Redteam-AI-assist
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```bash
+cd ~/Redteam-AI-assist
+sudo apt update
+sudo apt install -y python3-venv python3-pip
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-Copy-Item .env.example .env
+cp .env.example .env
 ```
 
 ## 4. Environment Variables (`.env`)
@@ -102,90 +102,223 @@ Examples of good content:
 
 After updating files, rebuild index:
 
-```powershell
-python scripts\build_rag_index.py
+```bash
+python scripts/build_rag_index.py
 ```
 
-## 6. Run API Server
+## 6. Run API Server (manual)
 
-```powershell
+```bash
 uvicorn redteam_ai_assist.main:app --app-dir src --host 0.0.0.0 --port 8088 --reload
 ```
 
 Health check:
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8088/health
+```bash
+curl -s http://127.0.0.1:8088/health
 ```
 
 ## 7. API Usage
 
 ### Start session
 
-```powershell
-$body = @{
-  tenant_id = "student1"
-  user_id = "student1-001"
-  agent_id = "student1-001"
-  objective = "Complete web lab objective"
-  target_scope = @("10.10.10.25","web01.lab.local")
-  policy_id = "lab-default"
-} | ConvertTo-Json
-
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8088/v1/sessions -ContentType "application/json" -Body $body
+```bash
+curl -s -X POST http://127.0.0.1:8088/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id":"student1",
+    "user_id":"student1-001",
+    "agent_id":"student1-001",
+    "objective":"Complete web lab objective",
+    "target_scope":["10.10.10.25","web01.lab.local"],
+    "policy_id":"lab-default"
+  }'
 ```
 
 ### Ingest telemetry events
 
-```powershell
-$events = @{
-  events = @(
-    @{
-      event_type = "command"
-      payload = @{ command = "nmap -sV -Pn 10.10.10.25"; exit_code = 0 }
-    },
-    @{
-      event_type = "http"
-      payload = @{ method = "GET"; url = "http://10.10.10.25/admin"; status_code = 403 }
-    }
-  )
-} | ConvertTo-Json -Depth 5
-
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/events" -ContentType "application/json" -Body $events
+```bash
+curl -s -X POST http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events":[
+      {
+        "event_type":"command",
+        "payload":{"command":"nmap -sV -Pn 10.10.10.25","exit_code":0}
+      },
+      {
+        "event_type":"http",
+        "payload":{"method":"GET","url":"http://10.10.10.25/admin","status_code":403}
+      }
+    ]
+  }'
 ```
 
 ### Get next-step suggestion
 
-```powershell
-$suggest = @{ user_message = "Need next step" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/suggest" -ContentType "application/json" -Body $suggest
+```bash
+curl -s -X POST http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/suggest \
+  -H "Content-Type: application/json" \
+  -d '{"user_message":"Need next step"}'
 ```
 
 ### Rebuild RAG index from API
 
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8088/v1/rag/reindex
+```bash
+curl -s -X POST http://127.0.0.1:8088/v1/rag/reindex
 ```
 
-## 8. Integration Notes for Your Infrastructure
+## 8. LXC Deploy Guide (Debian on Proxmox)
 
-Map your existing environment:
-- Router: `D:\vannhan\cyber-range-router`
-- Kali per-user packer: `D:\vannhan\packer-kali-user-space`
-- Wazuh AIO packer: `D:\vannhan\packer-wazuh-AIO`
+This section assumes:
+- Proxmox host, VLANs configured on a bridge (example `vmbr1` for lab).
+- One LXC container dedicated for AI service on the same VLAN as router/orchestrator.
+- You will not expose the AI API directly to student subnets.
+
+### 8.1 Create LXC (Proxmox)
+
+Recommended resources:
+- 2-4 vCPU, 4-8GB RAM
+- 20-40GB disk
+- Unprivileged container
+- Debian 12 template
+
+Example `pct` create (adjust IDs/paths):
+
+```bash
+pct create 210 local:vztmpl/debian-12-standard_12.5-1_amd64.tar.zst \
+  --hostname redteam-ai \
+  --cores 4 --memory 8192 --swap 1024 \
+  --rootfs local-lvm:20 \
+  --unprivileged 1 \
+  --net0 name=eth0,bridge=vmbr1,ip=192.168.50.10/24,gw=192.168.50.1
+pct start 210
+```
+
+### 8.2 Install dependencies inside LXC
+
+```bash
+apt update
+apt install -y python3-venv python3-pip nginx
+useradd -r -m -d /opt/redteam-ai -s /usr/sbin/nologin redteam-ai
+```
+
+### 8.3 Deploy app in `/opt/redteam-ai`
+
+```bash
+cd /opt/redteam-ai
+git clone <YOUR_REPO_URL> .
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Edit `.env`:
+- `LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_API_KEY` or `GROQ_API_KEY`
+- `HF_TOKEN` for hosted embeddings
+
+Build RAG index:
+
+```bash
+python scripts/build_rag_index.py
+```
+
+### 8.4 Systemd service (recommended)
+
+Create file `/etc/systemd/system/redteam-ai.service`:
+
+```ini
+[Unit]
+Description=Redteam AI Assist API
+After=network.target
+
+[Service]
+Type=simple
+User=redteam-ai
+WorkingDirectory=/opt/redteam-ai
+EnvironmentFile=/opt/redteam-ai/.env
+ExecStart=/opt/redteam-ai/.venv/bin/uvicorn redteam_ai_assist.main:app --app-dir src --host 127.0.0.1 --port 8088
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable service:
+
+```bash
+systemctl daemon-reload
+systemctl enable --now redteam-ai
+systemctl status redteam-ai --no-pager
+```
+
+### 8.5 Nginx reverse proxy (HTTP)
+
+Create file `/etc/nginx/sites-available/redteam-ai`:
+
+```nginx
+server {
+    listen 80;
+    server_name _;  # set to your domain or IP
+
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable site:
+
+```bash
+ln -s /etc/nginx/sites-available/redteam-ai /etc/nginx/sites-enabled/redteam-ai
+nginx -t
+systemctl reload nginx
+```
+
+### 8.6 Firewall + VLAN ACL (minimal safe baseline)
+
+Goal: only router/orchestrator subnet can reach AI API.
+
+Example `ufw` inside LXC (replace with your router subnet):
+
+```bash
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow from 192.168.50.1 to any port 80 proto tcp
+ufw allow from 192.168.50.1 to any port 8088 proto tcp
+ufw enable
+ufw status verbose
+```
+
+VLAN ACL rule on router (conceptual):
+- Allow: `router_orchestrator_subnet -> redteam-ai:80/8088`
+- Deny: `student_subnet -> redteam-ai:any`
+
+## 9. Integration Notes for Your Infrastructure
+
+Map your existing environment (example on Debian):
+- Router: `/srv/cyber-range-router`
+- Kali per-user packer: `/srv/packer-kali-user-space`
+- Wazuh AIO packer: `/srv/packer-wazuh-AIO`
 
 Recommended integration flow:
 - On Kali boot/enroll, send telemetry events into this assistant with `agent_id`.
 - Use `agent_id` + `tenant_id` as the same isolation key strategy you already use with Wazuh DLS.
 - On lab teardown, delete session JSON files in `runtime/sessions/` by `session_id` if you want full cleanup.
 
-## 9. Run Tests
+## 10. Run Tests
 
-```powershell
+```bash
 pytest -q
 ```
 
-## 10. Safety Boundary
+## 11. Safety Boundary
 
 This project is intended for isolated cyber range labs.  
 Do not use outside authorized environments.
