@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from redteam_ai_assist.core.models import ActionItem
 
 IP_PATTERN = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+IP_WITH_SUFFIX_PATTERN = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}[-_][A-Za-z0-9._-]+$")
 HOST_PATTERN = re.compile(r"\b[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+\b")
 FILE_EXTENSIONS = {
     "txt",
@@ -116,6 +117,8 @@ class PolicyGuard:
     def _looks_like_file(candidate: str) -> bool:
         lowered = candidate.lower().strip()
         if "/" in lowered or "\\" in lowered:
+            return True
+        if IP_WITH_SUFFIX_PATTERN.match(lowered):
             return True
         if "." not in lowered:
             return False

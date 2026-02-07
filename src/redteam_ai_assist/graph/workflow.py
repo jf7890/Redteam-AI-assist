@@ -86,6 +86,7 @@ class AssistantWorkflow:
 
     def _suggest_node(self, state: AssistantState) -> AssistantState:
         session = state["session"]
+        latest_note = session.notes[-1] if session.notes else ""
         llm_context = LLMContext(
             objective=session.objective,
             phase=state["phase"],
@@ -93,6 +94,7 @@ class AssistantWorkflow:
             missing_artifacts=state["missing_artifacts"],
             retrieved_context=state.get("retrieved_context", []),
             target_scope=session.target_scope,
+            user_message=latest_note,
         )
         reasoning, actions = self.llm_client.generate_actions(llm_context)
         return {"reasoning": reasoning, "actions": actions}

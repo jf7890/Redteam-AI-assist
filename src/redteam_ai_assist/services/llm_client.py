@@ -19,6 +19,7 @@ class LLMContext:
     missing_artifacts: list[str]
     retrieved_context: list[RetrievedContext]
     target_scope: list[str]
+    user_message: str
 
 
 class RedteamLLMClient:
@@ -73,6 +74,7 @@ class RedteamLLMClient:
             "episode_summary": context.episode_summary,
             "missing_artifacts": context.missing_artifacts,
             "target_scope": context.target_scope,
+            "user_message": context.user_message,
             "retrieved_context": rag_context,
             "constraints": [
                 "Lab-only coaching. Never provide real-world destructive instructions.",
