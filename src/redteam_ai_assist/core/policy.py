@@ -7,6 +7,23 @@ from redteam_ai_assist.core.models import ActionItem
 
 IP_PATTERN = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 HOST_PATTERN = re.compile(r"\b[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+\b")
+FILE_EXTENSIONS = {
+    "txt",
+    "md",
+    "log",
+    "json",
+    "csv",
+    "nmap",
+    "gnmap",
+    "xml",
+    "html",
+    "htm",
+    "pdf",
+    "png",
+    "jpg",
+    "jpeg",
+    "svg",
+}
 
 
 class PolicyGuard:
@@ -88,7 +105,19 @@ class PolicyGuard:
 
         out_of_scope = set()
         for candidate in candidates:
+            if self._looks_like_file(candidate):
+                continue
             normalized_candidate = self._normalize_target(candidate)
             if normalized_candidate and normalized_candidate not in normalized_scope:
                 out_of_scope.add(normalized_candidate)
         return out_of_scope
+
+    @staticmethod
+    def _looks_like_file(candidate: str) -> bool:
+        lowered = candidate.lower().strip()
+        if "/" in lowered or "\\" in lowered:
+            return True
+        if "." not in lowered:
+            return False
+        ext = lowered.rsplit(".", maxsplit=1)[-1]
+        return ext in FILE_EXTENSIONS

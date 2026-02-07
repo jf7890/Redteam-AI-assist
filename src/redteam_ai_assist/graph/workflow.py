@@ -74,9 +74,11 @@ class AssistantWorkflow:
 
     def _retrieve_rag_node(self, state: AssistantState) -> AssistantState:
         session = state["session"]
+        latest_note = session.notes[-1] if session.notes else ""
         query = (
             f"objective: {session.objective}\n"
             f"phase: {state['phase']}\n"
+            f"latest_note: {latest_note}\n"
             f"episode_summary: {state['episode_summary']}"
         )
         chunks = self.retriever.query(query, top_k=self.rag_top_k)

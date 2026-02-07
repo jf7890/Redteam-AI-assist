@@ -119,15 +119,17 @@ class RedteamLLMClient:
             for item in actions_raw[:4]:
                 if not isinstance(item, dict):
                     continue
+                raw_command = item.get("command")
+                command = None
+                if raw_command is not None:
+                    command = str(raw_command).strip()
+                    if command.lower() in {"none", "null", "n/a", "na", ""}:
+                        command = None
                 actions.append(
                     ActionItem(
                         title=str(item.get("title", "")).strip() or "Next step",
                         rationale=str(item.get("rationale", "")).strip() or "Follow lab methodology.",
-                        command=(
-                            str(item.get("command", "")).strip()
-                            if item.get("command") is not None
-                            else None
-                        ),
+                        command=command,
                         done_criteria=(
                             str(item.get("done_criteria", "")).strip()
                             or PHASE_DONE_CRITERIA[context.phase]
