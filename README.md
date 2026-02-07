@@ -40,6 +40,7 @@ Redteam-AI-assist/
   scripts/
     build_rag_index.py
     demo_session.py
+    kali_telemetry_agent.py
   data/rag/knowledge_base/
     01_phase_checklist.md
     02_reporting_template.md
@@ -162,6 +163,36 @@ curl -s -X POST http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/events \
 curl -s -X POST http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/suggest \
   -H "Content-Type: application/json" \
   -d '{"user_message":"Need next step"}'
+```
+
+### Suggest with session memory mode
+
+The assistant supports memory policies per request:
+- `summary`: only episode summary + RAG.
+- `window`: last `history_window` events + summary + RAG.
+- `full`: all session events + summary + RAG.
+
+```bash
+curl -s -X POST http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/suggest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_message":"xong roi, tiep theo la gi?",
+    "memory_mode":"window",
+    "history_window":20
+  }'
+```
+
+### Resume/list/delete session
+
+```bash
+# Get one session (for UI reload/resume)
+curl -s http://127.0.0.1:8088/v1/sessions/<SESSION_ID>
+
+# List latest sessions
+curl -s "http://127.0.0.1:8088/v1/sessions?tenant_id=student1&limit=20"
+
+# Teardown one session
+curl -s -X DELETE http://127.0.0.1:8088/v1/sessions/<SESSION_ID> -i
 ```
 
 ### Rebuild RAG index from API
@@ -312,7 +343,25 @@ Map your existing environment (example on Debian):
 Recommended integration flow:
 - On Kali boot/enroll, send telemetry events into this assistant with `agent_id`.
 - Use `agent_id` + `tenant_id` as the same isolation key strategy you already use with Wazuh DLS.
-- On lab teardown, delete session JSON files in `runtime/sessions/` by `session_id` if you want full cleanup.
+- On lab teardown, call `DELETE /v1/sessions/{session_id}` for cleanup.
+
+### 9.1 Kali telemetry agent (auto command ingestion)
+
+Instead of posting events manually, run:
+
+```bash
+export BASE_URL="http://127.0.0.1:8088"
+export SESSION_ID="<SESSION_ID>"
+python scripts/kali_telemetry_agent.py --poll-interval 5 --verbose
+```
+
+This agent tails shell history (`~/.zsh_history`, `~/.bash_history`) and auto-posts new commands as `command` events.
+
+Run one-shot debug cycle:
+
+```bash
+python scripts/kali_telemetry_agent.py --once --verbose
+```
 
 ## 10. Run Tests
 

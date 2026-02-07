@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 EventType = Literal["command", "http", "scan", "note", "system"]
 PhaseName = Literal["recon", "enumeration", "hypothesis", "attempt", "post_check", "report"]
+MemoryMode = Literal["summary", "window", "full"]
 
 
 def utc_now() -> datetime:
@@ -59,6 +60,17 @@ class ActionItem(BaseModel):
 
 class SuggestRequest(BaseModel):
     user_message: str | None = None
+    memory_mode: MemoryMode = "window"
+    history_window: int = Field(default=12, ge=1, le=120)
+
+
+class SessionSummary(BaseModel):
+    session_id: str
+    tenant_id: str
+    user_id: str
+    agent_id: str
+    current_phase: PhaseName
+    updated_at: datetime
 
 
 class RetrievedContext(BaseModel):

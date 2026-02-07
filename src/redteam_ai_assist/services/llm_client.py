@@ -20,6 +20,8 @@ class LLMContext:
     retrieved_context: list[RetrievedContext]
     target_scope: list[str]
     user_message: str
+    memory_mode: str
+    conversation_context: list[dict[str, str]]
 
 
 class RedteamLLMClient:
@@ -75,12 +77,15 @@ class RedteamLLMClient:
             "missing_artifacts": context.missing_artifacts,
             "target_scope": context.target_scope,
             "user_message": context.user_message,
+            "memory_mode": context.memory_mode,
+            "conversation_context": context.conversation_context[-40:],
             "retrieved_context": rag_context,
             "constraints": [
                 "Lab-only coaching. Never provide real-world destructive instructions.",
                 "Use only in-scope targets and allowed lab tools.",
                 "Provide checklist-style next actions with completion criteria.",
                 "No credential theft or persistence guidance.",
+                "Use conversation_context as session memory and avoid repeating completed steps.",
             ],
             "output_format": {
                 "reasoning": "short string",

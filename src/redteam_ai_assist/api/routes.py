@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from redteam_ai_assist.core.models import (
     EventIngestRequest,
     ReindexResponse,
     SessionRecord,
+    SessionSummary,
     SessionStartRequest,
     SuggestRequest,
     SuggestResponse,
@@ -39,6 +40,27 @@ def ingest_events(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
+@router.get("/sessions/{session_id}", response_model=SessionRecord)
+def get_session(
+    session_id: str,
+    service: AssistantService = Depends(get_service),
+) -> SessionRecord:
+    try:
+        return service.get_session(session_id=session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/sessions", response_model=list[SessionSummary])
+def list_sessions(
+    tenant_id: str | None = Query(default=None),
+    user_id: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    service: AssistantService = Depends(get_service),
+) -> list[SessionSummary]:
+    return service.list_sessions(tenant_id=tenant_id, user_id=user_id, limit=limit)
+
+
 @router.post("/sessions/{session_id}/suggest", response_model=SuggestResponse)
 def suggest(
     session_id: str,
@@ -49,6 +71,18 @@ def suggest(
         return service.suggest(session_id=session_id, request=payload)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(
+    session_id: str,
+    service: AssistantService = Depends(get_service),
+) -> Response:
+    try:
+        service.delete_session(session_id=session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/rag/reindex", response_model=ReindexResponse)

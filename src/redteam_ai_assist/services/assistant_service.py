@@ -5,6 +5,7 @@ from redteam_ai_assist.core.models import (
     EventIngestRequest,
     ReindexResponse,
     SessionRecord,
+    SessionSummary,
     SessionStartRequest,
     SuggestRequest,
     SuggestResponse,
@@ -49,6 +50,36 @@ class AssistantService:
     def ingest_events(self, session_id: str, request: EventIngestRequest) -> SessionRecord:
         return self.session_store.append_events(session_id=session_id, request=request)
 
+    def get_session(self, session_id: str) -> SessionRecord:
+        session = self.session_store.get_session(session_id=session_id)
+        if session is None:
+            raise KeyError(f"Session {session_id} not found")
+        return session
+
+    def list_sessions(
+        self,
+        tenant_id: str | None = None,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[SessionSummary]:
+        sessions = self.session_store.list_sessions(tenant_id=tenant_id, user_id=user_id, limit=limit)
+        return [
+            SessionSummary(
+                session_id=item.session_id,
+                tenant_id=item.tenant_id,
+                user_id=item.user_id,
+                agent_id=item.agent_id,
+                current_phase=item.current_phase,
+                updated_at=item.updated_at,
+            )
+            for item in sessions
+        ]
+
+    def delete_session(self, session_id: str) -> None:
+        deleted = self.session_store.delete_session(session_id=session_id)
+        if not deleted:
+            raise KeyError(f"Session {session_id} not found")
+
     def suggest(self, session_id: str, request: SuggestRequest) -> SuggestResponse:
         if request.user_message:
             self.session_store.append_note(session_id=session_id, message=request.user_message)
@@ -57,7 +88,11 @@ class AssistantService:
         if session is None:
             raise KeyError(f"Session {session_id} not found")
 
-        state = self.workflow.run(session)
+        state = self.workflow.run(
+            session,
+            memory_mode=request.memory_mode,
+            history_window=request.history_window,
+        )
         phase = state.get("phase", session.current_phase)
         session.current_phase = phase
         session.last_reasoning = state.get("reasoning")

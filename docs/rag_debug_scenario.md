@@ -59,7 +59,11 @@ curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/events" \
 ```bash
 curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/suggest" \
   -H "Content-Type: application/json" \
-  -d '{"user_message":"need recon checklist"}' | python -m json.tool
+  -d '{
+    "user_message":"need recon checklist",
+    "memory_mode":"window",
+    "history_window":12
+  }' | python -m json.tool
 ```
 
 Expected (high-level):
@@ -85,13 +89,27 @@ Example snippet:
 ```bash
 curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/suggest" \
   -H "Content-Type: application/json" \
-  -d '{"user_message":"need report template"}' | python -m json.tool
+  -d '{
+    "user_message":"need report template",
+    "memory_mode":"window",
+    "history_window":20
+  }' | python -m json.tool
 ```
 
 Expected (high-level):
 - `episode_summary` includes `Recent notes: need report template`.
 - `phase` should be `report`.
 - `retrieved_context` includes a source from `02_reporting_template.md`.
+
+## 5) Validate session persistence (reload use-case)
+
+```bash
+curl -s "$BASE_URL/v1/sessions/$SESSION_ID" | python -m json.tool
+```
+
+Expected:
+- Session returns with existing `events`, `notes`, `current_phase`.
+- UI/client can restore context after reload using this endpoint.
 
 ## Troubleshooting
 

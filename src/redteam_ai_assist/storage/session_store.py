@@ -49,6 +49,28 @@ class SessionStore:
                 encoding="utf-8",
             )
 
+    def list_sessions(
+        self,
+        tenant_id: str | None = None,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[SessionRecord]:
+        sessions: list[SessionRecord] = []
+        for path in sorted(self.store_dir.glob("*.json")):
+            try:
+                payload = path.read_text(encoding="utf-8")
+                session = SessionRecord.model_validate_json(payload)
+            except Exception:
+                continue
+            if tenant_id and session.tenant_id != tenant_id:
+                continue
+            if user_id and session.user_id != user_id:
+                continue
+            sessions.append(session)
+
+        sessions.sort(key=lambda item: item.updated_at, reverse=True)
+        return sessions[:limit]
+
     def append_events(self, session_id: str, request: EventIngestRequest) -> SessionRecord:
         session = self.get_session(session_id)
         if session is None:
@@ -73,6 +95,14 @@ class SessionStore:
             session.events = session.events[-self.max_events :]
         self.save_session(session)
         return session
+
+    def delete_session(self, session_id: str) -> bool:
+        path = self._session_path(session_id)
+        if not path.exists():
+            return False
+        with self._lock:
+            path.unlink(missing_ok=True)
+        return True
 
     def _session_path(self, session_id: str) -> Path:
         return self.store_dir / f"{session_id}.json"
