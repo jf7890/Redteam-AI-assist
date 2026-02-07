@@ -332,3 +332,8 @@ Mermaid diagram file: `docs/architecture.mmd`.
 You can render it with:
 - GitHub (auto-render in Markdown viewers that support Mermaid).
 - `npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.png`
+
+## 13. RAG Debug Scenario
+
+Step-by-step curl flow (recon vs report) to verify retrieval:
+- `docs/rag_debug_scenario.md`
