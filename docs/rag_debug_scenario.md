@@ -80,7 +80,7 @@ Example snippet:
 }
 ```
 
-## 4) Ask for report guidance
+## 4) Ask for report guidance (should flip phase to report)
 
 ```bash
 curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/suggest" \
@@ -90,6 +90,7 @@ curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/suggest" \
 
 Expected (high-level):
 - `episode_summary` includes `Recent notes: need report template`.
+- `phase` should be `report`.
 - `retrieved_context` includes a source from `02_reporting_template.md`.
 
 ## Troubleshooting

@@ -40,10 +40,24 @@ PHASE_PATTERNS: dict[PhaseName, tuple[str, ...]] = {
     "report": ("report", "summary", "timeline", "evidence"),
 }
 
+REPORT_KEYWORDS = ("report", "template", "timeline", "findings", "final notes")
+RECON_KEYWORDS = ("recon", "reconnaissance", "inventory", "checklist")
+
 
 def detect_phase(events: list[ActivityEvent], current_phase: PhaseName) -> tuple[PhaseName, float]:
     if not events:
         return current_phase, 0.4
+
+    note_text = []
+    for event in events[-10:]:
+        if event.event_type == "note":
+            note_text.append(str(event.payload.get("message", "")))
+    note_text = " ".join(note_text).lower()
+    if note_text:
+        if any(keyword in note_text for keyword in REPORT_KEYWORDS):
+            return "report", 0.9
+        if any(keyword in note_text for keyword in RECON_KEYWORDS):
+            return "recon", 0.85
 
     recent_text = []
     for event in events[-20:]:

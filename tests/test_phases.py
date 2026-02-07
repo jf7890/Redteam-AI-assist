@@ -28,3 +28,21 @@ def test_infer_missing_artifacts() -> None:
     ]
     missing = infer_missing_artifacts(events, phase="enumeration")
     assert "deep_service_findings" in missing
+
+
+def test_detect_phase_from_report_note() -> None:
+    events = [
+        ActivityEvent(event_type="note", payload={"message": "need report template"}),
+    ]
+    phase, confidence = detect_phase(events, current_phase="recon")
+    assert phase == "report"
+    assert confidence >= 0.8
+
+
+def test_detect_phase_from_recon_note() -> None:
+    events = [
+        ActivityEvent(event_type="note", payload={"message": "need recon checklist"}),
+    ]
+    phase, confidence = detect_phase(events, current_phase="report")
+    assert phase == "recon"
+    assert confidence >= 0.8
