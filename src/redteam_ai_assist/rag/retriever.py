@@ -13,7 +13,7 @@ class RagRetriever:
         self.embedder = embedder
         self.store = store
 
-    def query(self, text: str, top_k: int = 4) -> list[RetrievedContext]:
+    def query(self, text: str, top_k: int = 4, focus: str = "auto") -> list[RetrievedContext]:
         text = text.strip()
         if not text:
             return []
@@ -22,7 +22,7 @@ class RagRetriever:
         candidate_k = max(top_k * 2, top_k)
         matches = self.store.search(query_embedding, top_k=candidate_k)
         boosted = self._apply_keyword_boost(text, matches)
-        focused = self._apply_focus_filter(text, boosted)
+        focused = self._apply_focus_filter(text, boosted, focus=focus)
         return [
             RetrievedContext(
                 source=str(record.metadata.get("source", "unknown")),
@@ -60,11 +60,19 @@ class RagRetriever:
 
     @staticmethod
     def _apply_focus_filter(
-        query: str, matches: list[tuple[VectorRecord, float]]
+        query: str, matches: list[tuple[VectorRecord, float]], focus: str = "auto"
     ) -> list[tuple[VectorRecord, float]]:
         query_lower = query.lower()
-        wants_report = any(hint in query_lower for hint in REPORT_HINTS)
-        wants_recon = any(hint in query_lower for hint in RECON_HINTS)
+        normalized_focus = focus.strip().lower()
+        if normalized_focus == "report":
+            wants_report = True
+            wants_recon = False
+        elif normalized_focus == "recon":
+            wants_report = False
+            wants_recon = True
+        else:
+            wants_report = any(hint in query_lower for hint in REPORT_HINTS)
+            wants_recon = any(hint in query_lower for hint in RECON_HINTS)
 
         if not wants_report and not wants_recon:
             return matches

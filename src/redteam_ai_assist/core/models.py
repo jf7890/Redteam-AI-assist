@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 EventType = Literal["command", "http", "scan", "note", "system"]
 PhaseName = Literal["recon", "enumeration", "hypothesis", "attempt", "post_check", "report"]
 MemoryMode = Literal["summary", "window", "full"]
+RagFocus = Literal["auto", "recon", "report"]
 
 
 def utc_now() -> datetime:
@@ -62,6 +63,9 @@ class SuggestRequest(BaseModel):
     user_message: str | None = None
     memory_mode: MemoryMode = "window"
     history_window: int = Field(default=12, ge=1, le=120)
+    phase_override: PhaseName | None = None
+    persist_phase_override: bool = False
+    rag_focus: RagFocus = "auto"
 
 
 class SessionSummary(BaseModel):

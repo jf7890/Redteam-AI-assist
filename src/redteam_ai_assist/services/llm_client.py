@@ -22,6 +22,7 @@ class LLMContext:
     user_message: str
     memory_mode: str
     conversation_context: list[dict[str, str]]
+    rag_focus: str
 
 
 class RedteamLLMClient:
@@ -78,6 +79,7 @@ class RedteamLLMClient:
             "target_scope": context.target_scope,
             "user_message": context.user_message,
             "memory_mode": context.memory_mode,
+            "rag_focus": context.rag_focus,
             "conversation_context": context.conversation_context[-40:],
             "retrieved_context": rag_context,
             "constraints": [

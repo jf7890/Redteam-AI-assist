@@ -92,9 +92,13 @@ class AssistantService:
             session,
             memory_mode=request.memory_mode,
             history_window=request.history_window,
+            phase_override=request.phase_override,
+            rag_focus=request.rag_focus,
         )
         phase = state.get("phase", session.current_phase)
-        session.current_phase = phase
+        should_persist_phase = not request.phase_override or request.persist_phase_override
+        if should_persist_phase:
+            session.current_phase = phase
         session.last_reasoning = state.get("reasoning")
         self.session_store.save_session(session)
 

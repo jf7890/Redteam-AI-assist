@@ -16,6 +16,8 @@ class AssistantState(TypedDict, total=False):
     session: SessionRecord
     memory_mode: str
     history_window: int
+    phase_override: str | None
+    rag_focus: str
     episode_summary: str
     phase: PhaseName
     phase_confidence: float
@@ -40,11 +42,20 @@ class AssistantWorkflow:
         self.rag_top_k = rag_top_k
         self._graph = self._build_graph()
 
-    def run(self, session: SessionRecord, memory_mode: str = "window", history_window: int = 12) -> AssistantState:
+    def run(
+        self,
+        session: SessionRecord,
+        memory_mode: str = "window",
+        history_window: int = 12,
+        phase_override: str | None = None,
+        rag_focus: str = "auto",
+    ) -> AssistantState:
         initial_state: AssistantState = {
             "session": session,
             "memory_mode": memory_mode,
             "history_window": history_window,
+            "phase_override": phase_override,
+            "rag_focus": rag_focus,
         }
         return self._graph.invoke(initial_state)
 
@@ -73,6 +84,17 @@ class AssistantWorkflow:
 
     def _classify_phase_node(self, state: AssistantState) -> AssistantState:
         session = state["session"]
+        phase_override = state.get("phase_override")
+        if phase_override:
+            phase = phase_override
+            confidence = 0.99
+            missing_artifacts = infer_missing_artifacts(session.events, phase)
+            return {
+                "phase": phase,
+                "phase_confidence": confidence,
+                "missing_artifacts": missing_artifacts,
+            }
+
         phase, confidence = detect_phase(session.events, session.current_phase)
         missing_artifacts = infer_missing_artifacts(session.events, phase)
         return {
@@ -84,13 +106,15 @@ class AssistantWorkflow:
     def _retrieve_rag_node(self, state: AssistantState) -> AssistantState:
         session = state["session"]
         latest_note = session.notes[-1] if session.notes else ""
+        rag_focus = state.get("rag_focus", "auto")
         query = (
             f"objective: {session.objective}\n"
             f"phase: {state['phase']}\n"
+            f"focus: {rag_focus}\n"
             f"latest_note: {latest_note}\n"
             f"episode_summary: {state['episode_summary']}"
         )
-        chunks = self.retriever.query(query, top_k=self.rag_top_k)
+        chunks = self.retriever.query(query, top_k=self.rag_top_k, focus=rag_focus)
         return {"retrieved_context": chunks}
 
     def _memory_node(self, state: AssistantState) -> AssistantState:
@@ -150,6 +174,7 @@ class AssistantWorkflow:
             user_message=latest_note,
             memory_mode=state.get("memory_mode", "window"),
             conversation_context=state.get("conversation_context", []),
+            rag_focus=state.get("rag_focus", "auto"),
         )
         reasoning, actions = self.llm_client.generate_actions(llm_context)
         return {"reasoning": reasoning, "actions": actions}

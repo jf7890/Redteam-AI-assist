@@ -54,13 +54,16 @@ curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/events" \
   }' > /dev/null
 ```
 
-## 3) Ask for recon guidance
+## 3) Ask for recon guidance (force recon focus)
 
 ```bash
 curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/suggest" \
   -H "Content-Type: application/json" \
   -d '{
     "user_message":"need recon checklist",
+    "rag_focus":"recon",
+    "phase_override":"recon",
+    "persist_phase_override":false,
     "memory_mode":"window",
     "history_window":12
   }' | python -m json.tool
@@ -84,13 +87,16 @@ Example snippet:
 }
 ```
 
-## 4) Ask for report guidance (should flip phase to report)
+## 4) Ask for report guidance (force report focus)
 
 ```bash
 curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/suggest" \
   -H "Content-Type: application/json" \
   -d '{
     "user_message":"need report template",
+    "rag_focus":"report",
+    "phase_override":"report",
+    "persist_phase_override":false,
     "memory_mode":"window",
     "history_window":20
   }' | python -m json.tool
@@ -100,6 +106,20 @@ Expected (high-level):
 - `episode_summary` includes `Recent notes: need report template`.
 - `phase` should be `report`.
 - `retrieved_context` includes a source from `02_reporting_template.md`.
+
+## 4.1) Bootstrap automatic recon events (optional)
+
+```bash
+python scripts/kali_telemetry_agent.py \
+  --base-url "$BASE_URL" \
+  --session-id "$SESSION_ID" \
+  --auto-recon-target 10.10.10.25 \
+  --once --verbose
+```
+
+Expected:
+- A new `command` event (`nmap -sV -Pn ...`) appears in session.
+- A new `http` event may appear if header probe succeeds.
 
 ## 5) Validate session persistence (reload use-case)
 
@@ -117,5 +137,5 @@ Expected:
   - Set `RAG_TOP_K=4` and `RAG_CHUNK_SIZE=1200` in `.env`.
   - Rebuild index: `python scripts/build_rag_index.py`.
   - Ensure `HF_TOKEN` is set for better embeddings.
-- Query string is built from `objective + phase + episode_summary` in
+- Query string is built from `objective + phase + focus + latest_note + episode_summary` in
   `src/redteam_ai_assist/graph/workflow.py` (`_retrieve_rag_node`).
