@@ -130,6 +130,11 @@ curl -s -X POST http://127.0.0.1:8088/v1/rag/reindex
 
 ## 12. Integration
 - Use Kali telemetry agent for auto command ingestion or light recon: `python scripts/kali_telemetry_agent.py --poll-interval 5 --verbose`.
+- Download the agent with curl (run on the Kali client):
+```bash
+curl -fsSL http://<AI_SERVER>:8088/v1/agents/kali-telemetry-agent.py -o /tmp/kali_telemetry_agent.py
+BASE_URL=http://<AI_SERVER>:8088 SESSION_ID=<SESSION_ID> python /tmp/kali_telemetry_agent.py --poll-interval 5 --verbose
+```
 - Align `tenant_id`/`agent_id` with your range isolation; call `DELETE /v1/sessions/{session_id}` on teardown.
 - More walkthroughs: `docs/new_user_demo_flow.md` and `docs/rag_debug_scenario.md`.
 
