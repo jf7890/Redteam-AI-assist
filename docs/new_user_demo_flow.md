@@ -44,7 +44,12 @@ python scripts/kali_telemetry_agent.py \
 ```
 
 Expected:
-- Agent posts `nmap` command event and optional HTTP header event.
+- Agent posts an HTTP header probe event (`curl -I`).
+- (Optional) enable nmap by adding `--auto-recon-nmap`.
+
+Tip (make shell history visible to the agent quickly):
+- zsh: `setopt INC_APPEND_HISTORY SHARE_HISTORY`
+- bash: `export PROMPT_COMMAND='history -a; history -n; $PROMPT_COMMAND'`
 
 ## 3) Ask AI: what should I do first?
 

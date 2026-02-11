@@ -44,7 +44,7 @@ curl -s -X POST "$BASE_URL/v1/sessions/$SESSION_ID/events" \
     "events":[
       {
         "event_type":"command",
-        "payload":{"command":"nmap -sV -Pn 10.10.10.25","exit_code":0}
+        "payload":{"command":"whatweb http://10.10.10.25","exit_code":0}
       },
       {
         "event_type":"http",
@@ -118,8 +118,8 @@ python scripts/kali_telemetry_agent.py \
 ```
 
 Expected:
-- A new `command` event (`nmap -sV -Pn ...`) appears in session.
-- A new `http` event may appear if header probe succeeds.
+- A new `http` event appears in session (`curl -I ...`).
+- (Optional) add `--auto-recon-nmap` to also send an `nmap -sV -Pn ...` command event.
 
 ## 5) Validate session persistence (reload use-case)
 

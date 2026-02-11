@@ -32,6 +32,55 @@ class SessionStartRequest(BaseModel):
     policy_id: str = "lab-default"
 
 
+class EventIngestRequest(BaseModel):
+    events: list[ActivityEvent]
+
+
+class ActionItem(BaseModel):
+    title: str
+    rationale: str
+    done_criteria: str
+    command: str | None = None
+
+
+class RetrievedContext(BaseModel):
+    source: str
+    score: float
+    content: str
+
+
+class SuggestRequest(BaseModel):
+    user_message: str | None = None
+    memory_mode: MemoryMode = "window"
+    history_window: int = Field(default=12, ge=1, le=120)
+    phase_override: PhaseName | None = None
+    persist_phase_override: bool = False
+    rag_focus: RagFocus = "auto"
+
+
+class SuggestResponse(BaseModel):
+    session_id: str
+    phase: PhaseName
+    phase_confidence: float
+    missing_artifacts: list[str]
+    reasoning: str
+    actions: list[ActionItem]
+    retrieved_context: list[RetrievedContext]
+    episode_summary: str
+
+
+class CachedSuggest(BaseModel):
+    """Persisted cache for /suggest.
+
+    NOTE: we store the SuggestResponse payload as a JSON-serializable dict to keep
+    SessionRecord schema stable and avoid tight coupling.
+    """
+
+    fingerprint: str
+    payload: dict[str, Any]
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class SessionRecord(BaseModel):
     session_id: str
     tenant_id: str
@@ -47,25 +96,9 @@ class SessionRecord(BaseModel):
     notes: list[str] = Field(default_factory=list)
     last_reasoning: str | None = None
 
-
-class EventIngestRequest(BaseModel):
-    events: list[ActivityEvent]
-
-
-class ActionItem(BaseModel):
-    title: str
-    rationale: str
-    done_criteria: str
-    command: str | None = None
-
-
-class SuggestRequest(BaseModel):
-    user_message: str | None = None
-    memory_mode: MemoryMode = "window"
-    history_window: int = Field(default=12, ge=1, le=120)
-    phase_override: PhaseName | None = None
-    persist_phase_override: bool = False
-    rag_focus: RagFocus = "auto"
+    # MVP++: cache the last suggestion to reduce repeated LLM calls when
+    # the session context hasn't changed.
+    cached_suggest: CachedSuggest | None = None
 
 
 class SessionSummary(BaseModel):
@@ -75,23 +108,6 @@ class SessionSummary(BaseModel):
     agent_id: str
     current_phase: PhaseName
     updated_at: datetime
-
-
-class RetrievedContext(BaseModel):
-    source: str
-    score: float
-    content: str
-
-
-class SuggestResponse(BaseModel):
-    session_id: str
-    phase: PhaseName
-    phase_confidence: float
-    missing_artifacts: list[str]
-    reasoning: str
-    actions: list[ActionItem]
-    retrieved_context: list[RetrievedContext]
-    episode_summary: str
 
 
 class ReindexResponse(BaseModel):

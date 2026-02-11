@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     runtime_dir: Path = Path("runtime")
     session_store_dir: Path = Path("runtime/sessions")
 
+    # MVP++ caches (still file-based, safe for an internal cyber range)
+    cache_dir: Path = Path("runtime/cache")
+    embedding_cache_db: Path = Path("runtime/cache/embeddings.sqlite")
+    embedding_cache_ttl_days: int = 30
+    embedding_cache_max_entries: int = 50_000
+
     llm_provider: str = "mock"
     llm_model: str = "gpt-4o-mini"
     llm_base_url: str | None = None
@@ -38,12 +44,19 @@ class Settings(BaseSettings):
     rag_chunk_size: int = 1200
 
     max_events_per_session: int = 600
+    # Web-focused allowlist for a web-app-only cyber range.
+    # (Learners can still run other commands manually, but the assistant will only
+    # propose commands inside this set.)
     allowed_tools: str = (
-        "nmap,masscan,naabu,gobuster,ffuf,nikto,curl,wget,sqlmap,hydra,"
-        "netcat,nc,python,bash,sh,whoami,id,cat,ls,echo"
+        "curl,wget,httpx,whatweb,nikto,ffuf,gobuster,feroxbuster,dirsearch,"
+        "sqlmap,hydra,python,python3,bash,sh"
     )
+
+    # Block obviously destructive / system-admin commands. This is not a perfect sandbox,
+    # but helps prevent accidental misuse in training environments.
     blocklist_patterns: str = (
-        "rm -rf,shutdown,reboot,powershell Remove-Item,format c:,mkfs,dd if="
+        "rm -rf,shutdown,reboot,powershell Remove-Item,format c:,mkfs,dd if=,"
+        "sudo ,chmod ,chown ,useradd,usermod,passwd ,iptables,ufw ,systemctl,service "
     )
 
     def to_abs_path(self, path: Path) -> Path:
@@ -54,6 +67,14 @@ class Settings(BaseSettings):
     @property
     def session_store_path(self) -> Path:
         return self.to_abs_path(self.session_store_dir)
+
+    @property
+    def cache_path(self) -> Path:
+        return self.to_abs_path(self.cache_dir)
+
+    @property
+    def embedding_cache_path(self) -> Path:
+        return self.to_abs_path(self.embedding_cache_db)
 
     @property
     def rag_source_path(self) -> Path:

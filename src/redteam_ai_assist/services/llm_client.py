@@ -85,6 +85,7 @@ class RedteamLLMClient:
             "constraints": [
                 "Lab-only coaching. Never provide real-world destructive instructions.",
                 "Use only in-scope targets and allowed lab tools.",
+                "Web-app-only lab: focus on HTTP/web testing (no system/persistence/reverse shells).",
                 "Provide checklist-style next actions with completion criteria.",
                 "No credential theft or persistence guidance.",
                 "Use conversation_context as session memory and avoid repeating completed steps.",
@@ -158,10 +159,10 @@ class RedteamLLMClient:
         templates: dict[PhaseName, list[dict[str, Any]]] = {
             "recon": [
                 {
-                    "title": "Build in-scope service inventory",
-                    "rationale": "Inventory is required before deep enumeration.",
-                    "command": "nmap -sV -Pn <TARGET_IN_SCOPE>",
-                    "done_criteria": PHASE_DONE_CRITERIA["recon"],
+                    "title": "Probe the target over HTTP and record the baseline",
+                    "rationale": "Start with a safe HTTP header probe to confirm reachability and capture server hints.",
+                    "command": "curl -I http://<TARGET_IN_SCOPE>",
+                    "done_criteria": "You recorded the base URL(s), HTTP status, and any key headers (server, cookies, redirects).",
                 },
                 {
                     "title": "Capture baseline notes",
@@ -214,10 +215,10 @@ class RedteamLLMClient:
             ],
             "post_check": [
                 {
-                    "title": "Validate impact boundaries in lab",
-                    "rationale": "Impact must be demonstrated and bounded within scenario scope.",
-                    "command": "whoami",
-                    "done_criteria": PHASE_DONE_CRITERIA["post_check"],
+                    "title": "Validate impact using HTTP evidence",
+                    "rationale": "For a web-only lab, demonstrate impact with HTTP responses and screenshots/logged evidence.",
+                    "command": "curl -i http://<TARGET_IN_SCOPE>/<IMPACT_ENDPOINT>",
+                    "done_criteria": "You can reproduce the impact (e.g., unauthorized data access) and capture the HTTP evidence.",
                 },
                 {
                     "title": "Collect cleanup and reset notes",

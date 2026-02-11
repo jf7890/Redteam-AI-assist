@@ -32,7 +32,7 @@ def main() -> None:
             events=[
                 ActivityEvent(
                     event_type="command",
-                    payload={"command": "nmap -sV -Pn 10.10.10.25", "exit_code": 0},
+                    payload={"command": "curl -I http://10.10.10.25", "exit_code": 0},
                 ),
                 ActivityEvent(
                     event_type="http",

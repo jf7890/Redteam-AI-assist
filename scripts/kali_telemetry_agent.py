@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -50,9 +51,14 @@ def parse_args() -> argparse.Namespace:
         help="Run one lightweight recon against target (can be used multiple times)",
     )
     parser.add_argument(
+        "--auto-recon-nmap",
+        action="store_true",
+        help="Also run nmap in auto recon mode (off by default for web-only labs)",
+    )
+    parser.add_argument(
         "--auto-recon-full-port",
         action="store_true",
-        help="Use full-port nmap in auto recon mode",
+        help="Use full-port nmap in auto recon mode (requires --auto-recon-nmap)",
     )
     return parser.parse_args()
 
@@ -123,7 +129,84 @@ def build_payload(commands: list[str]) -> dict[str, list[dict[str, object]]]:
                 },
             }
         )
+
+        http_event = parse_http_from_command(command)
+        if http_event:
+            events.append({"event_type": "http", "payload": http_event})
     return {"events": events}
+
+
+HTTP_URL_RE = re.compile(r"(https?://[^\s'\"\)]+)", re.IGNORECASE)
+
+
+def parse_http_from_command(command: str) -> dict[str, object] | None:
+    """Best-effort extraction of HTTP telemetry from common web tools.
+
+    This helps the assistant reason about what the learner actually tried
+    (GET/POST + which URL), even if the shell history only contains the command.
+    """
+
+    cmd = command.strip()
+    if not cmd:
+        return None
+
+    tool = cmd.split()[0].lower()
+    if tool not in {"curl", "wget", "sqlmap", "httpx", "whatweb"}:
+        return None
+
+    m = HTTP_URL_RE.search(cmd)
+    if not m:
+        return None
+
+    url = m.group(1)
+    method = "GET"
+    summary = "parsed from command line"
+
+    lowered = cmd.lower()
+    if tool == "curl":
+        # HEAD probe
+        if re.search(r"(^|\s)--head(\s|$)", lowered) or re.search(r"(^|\s)-I(\s|$)", cmd):
+            method = "HEAD"
+
+        # Explicit method: -X/--request
+        parts = cmd.split()
+        for i, part in enumerate(parts):
+            if part in {"-X", "--request"} and i + 1 < len(parts):
+                method = parts[i + 1].upper()
+                break
+
+        # Data implies POST if method not explicitly set
+        data_flags = (" -d", " --data", " --data-raw", " --form", " --form-string", " -F")
+        if method == "GET" and any(flag in cmd or flag in lowered for flag in data_flags):
+            method = "POST"
+
+    elif tool == "wget":
+        method = "GET"
+    elif tool == "httpx":
+        method = "GET"
+        summary = "httpx probe parsed from command"
+    elif tool == "whatweb":
+        method = "GET"
+        summary = "whatweb probe parsed from command"
+    elif tool == "sqlmap":
+        method = "GET"
+        if " --data" in lowered or " -d" in lowered:
+            method = "POST"
+        if " --method" in lowered:
+            parts = cmd.split()
+            for i, part in enumerate(parts):
+                if part == "--method" and i + 1 < len(parts):
+                    method = parts[i + 1].upper()
+                    break
+        summary = "sqlmap target URL parsed from command"
+
+    return {
+        "method": method,
+        "url": url,
+        "status_code": 0,
+        "summary": summary,
+        "source": "kali_telemetry_agent.parsed",
+    }
 
 
 def post_payload(base_url: str, session_id: str, payload: dict[str, list[dict[str, object]]], verbose: bool = False) -> None:
@@ -181,23 +264,35 @@ def _summarize_nmap_output(output: str) -> str:
     return "No open services parsed from nmap output."
 
 
-def build_auto_recon_events(target: str, full_port: bool = False) -> list[dict[str, object]]:
-    nmap_args = ["nmap", "-sV", "-Pn", target]
-    if full_port:
-        nmap_args = ["nmap", "-sV", "-Pn", "-p-", target]
+def build_auto_recon_events(
+    target: str,
+    full_port: bool = False,
+    enable_nmap: bool = False,
+) -> list[dict[str, object]]:
+    """Lightweight web recon.
 
-    nmap_rc, nmap_output = _run_command(nmap_args)
-    events: list[dict[str, object]] = [
-        {
-            "event_type": "command",
-            "payload": {
-                "command": " ".join(nmap_args),
-                "exit_code": nmap_rc,
-                "stdout_summary": _summarize_nmap_output(nmap_output),
-                "source": "kali_telemetry_agent.auto_recon",
-            },
-        }
-    ]
+    Default is web-only (HTTP header probe). Nmap is optional.
+    """
+
+    events: list[dict[str, object]] = []
+
+    if enable_nmap:
+        nmap_args = ["nmap", "-sV", "-Pn", target]
+        if full_port:
+            nmap_args = ["nmap", "-sV", "-Pn", "-p-", target]
+
+        nmap_rc, nmap_output = _run_command(nmap_args)
+        events.append(
+            {
+                "event_type": "command",
+                "payload": {
+                    "command": " ".join(nmap_args),
+                    "exit_code": nmap_rc,
+                    "stdout_summary": _summarize_nmap_output(nmap_output),
+                    "source": "kali_telemetry_agent.auto_recon",
+                },
+            }
+        )
 
     for scheme in ("http", "https"):
         curl_args = ["curl", "-k", "-I", f"{scheme}://{target}"]
@@ -217,7 +312,7 @@ def build_auto_recon_events(target: str, full_port: bool = False) -> list[dict[s
                 {
                     "event_type": "http",
                     "payload": {
-                        "method": "GET",
+                        "method": "HEAD",
                         "url": f"{scheme}://{target}",
                         "status_code": status_code or 200,
                         "summary": status_line or "header probe completed",
@@ -242,7 +337,13 @@ def main() -> None:
     if args.auto_recon_target:
         recon_events: list[dict[str, object]] = []
         for target in args.auto_recon_target:
-            recon_events.extend(build_auto_recon_events(target.strip(), full_port=args.auto_recon_full_port))
+            recon_events.extend(
+                build_auto_recon_events(
+                    target.strip(),
+                    full_port=args.auto_recon_full_port,
+                    enable_nmap=args.auto_recon_nmap,
+                )
+            )
         post_payload(args.base_url, args.session_id, {"events": recon_events}, verbose=args.verbose)
         if args.once:
             return

@@ -108,7 +108,7 @@ curl -s -X POST http://127.0.0.1:8088/v1/sessions \
 ```bash
 curl -s -X POST http://127.0.0.1:8088/v1/sessions/<SESSION_ID>/events \
   -H "Content-Type: application/json" \
-  -d '{"events":[{"event_type":"command","payload":{"command":"nmap -sV -Pn 10.10.10.25","exit_code":0}}]}'
+  -d '{"events":[{"event_type":"command","payload":{"command":"curl -I http://10.10.10.25","exit_code":0}}]}'
 ```
 - Get suggestion (optionally `memory_mode`/`rag_focus` in body):
 ```bash
@@ -129,7 +129,7 @@ curl -s -X POST http://127.0.0.1:8088/v1/rag/reindex
 - Restrict access with VLAN ACL/firewall so only orchestrator/router subnet reaches the API.
 
 ## 12. Integration
-- Use Kali telemetry agent for auto command ingestion or light recon: `python scripts/kali_telemetry_agent.py --poll-interval 5 --verbose`.
+- Use Kali telemetry agent for auto command ingestion. Optional lightweight HTTP recon with `--auto-recon-target ...` (and `--auto-recon-nmap` if you want port scanning in your lab).
 - Download the agent with curl (run on the Kali client):
 ```bash
 curl -fsSL http://<AI_SERVER>:8088/v1/agents/kali-telemetry-agent.py -o /tmp/kali_telemetry_agent.py

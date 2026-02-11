@@ -32,11 +32,29 @@ PHASE_REQUIRED_ARTIFACTS: dict[PhaseName, list[str]] = {
 }
 
 PHASE_PATTERNS: dict[PhaseName, tuple[str, ...]] = {
-    "recon": ("nmap", "masscan", "naabu", "arp-scan", "netdiscover"),
-    "enumeration": ("gobuster", "ffuf", "nikto", "enum4linux", "dirsearch"),
-    "hypothesis": ("hypothesis", "possible weak point", "candidate issue"),
-    "attempt": ("sqlmap", "hydra", "exploit", "metasploit", "poc"),
-    "post_check": ("whoami", "id", "hostname", "proof", "verify impact"),
+    # Web-app-only cyber range: prefer HTTP probing and web fingerprinting.
+    "recon": ("curl", "wget", "httpx", "whatweb", "nikto", "nmap"),
+    # Content discovery / crawling.
+    "enumeration": (
+        "gobuster",
+        "ffuf",
+        "feroxbuster",
+        "dirsearch",
+        "wfuzz",
+        "paramspider",
+        "nikto",
+    ),
+    "hypothesis": (
+        "hypothesis",
+        "possible weak point",
+        "candidate issue",
+        "likely vuln",
+        "looks like",
+    ),
+    # Web exploit attempts.
+    "attempt": ("sqlmap", "hydra", "xss", "sqli", "lfi", "rce", "csrf", "poc", "exploit"),
+    # Validate impact (web-focused signals).
+    "post_check": ("verify", "impact", "proof", "flag", "admin", "unauthorized", "status="),
     "report": ("report", "summary", "timeline", "evidence"),
 }
 
@@ -90,15 +108,17 @@ def infer_artifacts(events: list[ActivityEvent]) -> set[str]:
         command = str(payload.get("command", "")).lower()
         message = str(payload.get("message", "")).lower()
 
-        if any(token in command for token in ("nmap", "masscan", "naabu")):
+        if any(token in command for token in ("curl", "wget", "whatweb", "httpx", "nikto", "nmap")):
             artifact_flags.add("service_inventory")
-        if any(token in command for token in ("gobuster", "ffuf", "nikto", "enum4linux")):
+        if any(token in command for token in ("gobuster", "ffuf", "feroxbuster", "dirsearch", "wfuzz", "nikto")):
             artifact_flags.add("deep_service_findings")
         if "hypothesis" in message or payload.get("hypothesis"):
             artifact_flags.add("ranked_hypotheses")
-        if any(token in command for token in ("sqlmap", "hydra", "exploit", "metasploit")):
+        if any(token in command for token in ("sqlmap", "hydra", "exploit", "poc")):
             artifact_flags.add("attempt_results")
-        if any(token in command for token in ("whoami", "id")) or "impact" in message:
+        if any(token in command for token in ("verify", "proof")) or any(
+            keyword in message for keyword in ("impact", "proof", "flag")
+        ):
             artifact_flags.add("impact_validation")
         if event.event_type == "note":
             artifact_flags.add("timeline_notes")
