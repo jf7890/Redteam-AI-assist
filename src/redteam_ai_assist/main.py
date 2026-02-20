@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from redteam_ai_assist.api.routes import router as assistant_router
 from redteam_ai_assist.config import get_settings
@@ -19,6 +20,18 @@ def create_app() -> FastAPI:
             "Uses LangGraph workflow + RAG + scope policy guard."
         ),
     )
+
+    cors_origins = settings.cors_allow_origins_list
+    if settings.cors_allow_all or cors_origins:
+        allow_origins = ["*"] if settings.cors_allow_all else cors_origins
+        allow_credentials = False if settings.cors_allow_all else settings.cors_allow_credentials
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allow_origins,
+            allow_credentials=allow_credentials,
+            allow_methods=settings.cors_allow_methods_list or ["*"],
+            allow_headers=settings.cors_allow_headers_list or ["*"],
+        )
     app.state.settings = settings
     app.state.assistant_service = service
     app.include_router(assistant_router)

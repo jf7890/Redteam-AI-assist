@@ -89,6 +89,11 @@ Key settings in `.env`:
 - `RAG_SOURCE_DIR=data/rag/knowledge_base`, `RAG_INDEX_PATH=data/rag/index/index.jsonl`.
 - `ALLOWED_TOOLS`, `BLOCKLIST_PATTERNS`.
 
+Web UI (CORS) settings:
+- `CORS_ALLOW_ALL=true` for lab-only allow-all origins.
+- Or set `CORS_ALLOW_ORIGINS=http://<UI_HOST>:<PORT>,http://localhost:5173`.
+- `CORS_ALLOW_CREDENTIALS=false` unless you use cookies.
+
 ## 9. Run Server
 
 ```bash

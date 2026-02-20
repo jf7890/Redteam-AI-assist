@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     api_host: str = "0.0.0.0"
     api_port: int = 8088
+    cors_allow_all: bool = False
+    cors_allow_origins: str = ""
+    cors_allow_credentials: bool = False
+    cors_allow_methods: str = "GET,POST,PUT,DELETE,OPTIONS"
+    cors_allow_headers: str = "*"
 
     project_root: Path = Field(default_factory=lambda: Path(__file__).resolve().parents[2])
     data_dir: Path = Path("data")
@@ -91,6 +96,24 @@ class Settings(BaseSettings):
     @property
     def blocklist_patterns_list(self) -> list[str]:
         return [item.strip().lower() for item in self.blocklist_patterns.split(",") if item.strip()]
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        if not self.cors_allow_origins:
+            return []
+        return [item.strip() for item in self.cors_allow_origins.split(",") if item.strip()]
+
+    @property
+    def cors_allow_methods_list(self) -> list[str]:
+        if not self.cors_allow_methods:
+            return []
+        return [item.strip().upper() for item in self.cors_allow_methods.split(",") if item.strip()]
+
+    @property
+    def cors_allow_headers_list(self) -> list[str]:
+        if not self.cors_allow_headers:
+            return []
+        return [item.strip() for item in self.cors_allow_headers.split(",") if item.strip()]
 
 
 @lru_cache(maxsize=1)
